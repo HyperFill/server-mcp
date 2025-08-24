@@ -1,6 +1,9 @@
 {
   "name": "mcp_ai_agents",
   "version": "1.0.0",
+  "engines": {
+    "node": "22.x"
+  },
   "main": "index.js",
   "bin": {
     "mcp_ai_agents": "bin/cli.js"
@@ -39,6 +42,5 @@
     "@types/minimatch": "^6.0.0",
     "@types/node": "^24.2.1",
     "typescript": "^5.9.2"
-    
   }
 }
