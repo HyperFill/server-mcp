@@ -23,7 +23,7 @@ const hyperfillAbi = [
 async function main() {
     const mcp_servers = [App]
     mcp_servers.map((server, index) => {
-        let port = (index + 3) * 1000
+        let port = process.env.PORT || (index + 3) * 1000
         server.listen(port, () => {
 
             try {
