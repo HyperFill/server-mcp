@@ -7,6 +7,8 @@ import { MarketManager } from "../../services/market-manager";
 import { config } from "../../services/config";
 import { getMidPriceGate } from "../../client/price-oracle-client";
 import { MarketMakerBotClient } from "../../client/hyperfill-mm-bot-client";
+import * as dotenv from 'dotenv'
+dotenv.config()
 
 // Schema definitions for read tool inputs
 const marketSelectionSchema = z.object({
@@ -103,7 +105,7 @@ const hyperfillAbi = [
 export function registerTools(server: McpServer, marketManager: MarketManager, seiClientFactory: () => Promise<Client>) {
 
     // Initialize bot client
-    const botClient = new MarketMakerBotClient();
+    const botClient = new MarketMakerBotClient(process.env.BOT_MARKET_MAKER_API || "http:localhost:8000");
 
     // Helper function to get market client
     const getMarketClient = (marketName: string): HyperFillMMClient | null => {
