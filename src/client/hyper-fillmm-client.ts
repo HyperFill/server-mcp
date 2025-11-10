@@ -8,6 +8,12 @@ export interface OrderPayload {
   side: 'bid' | 'ask';
   privateKey: string;
   type: 'limit' | 'market';
+  fromNetwork?: string;
+  toNetwork?: string;
+  from_network?: string;
+  to_network?: string;
+  receive_wallet?: string;
+  receiveWallet?: string;
 }
 
 export interface CancelOrderPayload {
@@ -121,7 +127,9 @@ export class HyperFillMMClient {
     quoteAsset: string,
     side: 'bid' | 'ask',
     price: string,
-    quantity: string
+    quantity: string,
+    networks?: { from?: string; to?: string },
+    receiveWallet?: string
   ): Promise<ApiResponse> {
     const payload: OrderPayload = {
       account: this.account,
@@ -131,7 +139,13 @@ export class HyperFillMMClient {
       quantity,
       side,
       privateKey: this.privateKey,
-      type: 'limit'
+      type: 'limit',
+      fromNetwork: networks?.from || 'hedera',
+      toNetwork: networks?.to || 'polygon',
+      from_network: networks?.from || 'hedera',
+      to_network: networks?.to || 'polygon',
+      receive_wallet: receiveWallet || this.account,
+      receiveWallet: receiveWallet || this.account
     };
 
     return this.makeApiCall('register_order', payload);
@@ -141,7 +155,9 @@ export class HyperFillMMClient {
     baseAsset: string,
     quoteAsset: string,
     side: 'bid' | 'ask',
-    quantity: string
+    quantity: string,
+    networks?: { from?: string; to?: string },
+    receiveWallet?: string
   ): Promise<ApiResponse> {
     const payload: OrderPayload = {
       account: this.account,
@@ -151,7 +167,13 @@ export class HyperFillMMClient {
       quantity,
       side,
       privateKey: this.privateKey,
-      type: 'market'
+      type: 'market',
+      fromNetwork: networks?.from || 'hedera',
+      toNetwork: networks?.to || 'polygon',
+      from_network: networks?.from || 'hedera',
+      to_network: networks?.to || 'polygon',
+      receive_wallet: receiveWallet || this.account,
+      receiveWallet: receiveWallet || this.account
     };
 
     return this.makeApiCall('register_order', payload);

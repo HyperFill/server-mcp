@@ -1,7 +1,8 @@
-// import { getSeiUsdtPrice } from "./client/descreener-price-oracle-client";
+// import { getHederaUsdtPrice } from "./client/descreener-price-oracle-client";
 import { getMidPriceGate } from "./client/price-oracle-client";
-import { fetchMcpSeiClient } from "./client/MCPSSEClient";
+import { fetchMcpHederaClient } from "./client/MCPSSEClient";
 import App from "./server/server"
+import { config } from "./services/config"
 // import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const hyperfillAbi = [
@@ -30,7 +31,7 @@ async function main() {
 
                 // clientCallTest()
                 // example()
-                fetchMcpSeiClient().then(async (client) => {
+                fetchMcpHederaClient().then(async (client) => {
                     // List tools
                     const tools = await client.listTools();
 
@@ -39,23 +40,23 @@ async function main() {
                     const result = await client.callTool({
                         name: "read_contract",
                         arguments: {
-                            contractAddress: "0xbaC8D6A511A673fCE111D8c14c760aDE68116558",
+                            contractAddress: process.env.VAULT_CONTRACT_ADDRESS || config.vaultContractAddress,
                             abi: hyperfillAbi,
                             functionName: "totalSupply",
                             args: [],
-                            network: "sei-testnet",
+                            network: config.network,
 
                         }
                     });
                     console.log(result, "TOOLS")
 
-                    // const p = await getSeiUsdtPrice();
-                    const j = await getMidPriceGate({ quote: "USDT", base: "SEI" })
+                    // const p = await getHederaUsdtPrice();
+                    const j = await getMidPriceGate({ quote: "USDT", base: "HBAR" })
                     // if (!p) {
-                    //     console.log("SEI/USDT pair not found on DexScreener (sei).");
+                    //     console.log("HBAR/USDT pair not found on DexScreener (hedera).");
                     //     return;
                     // }
-                    // console.log("SEI/USDT price USD:", p.priceUsd);
+                    // console.log("HBAR/USDT price USD:", p.priceUsd);
                     // console.log("priceNative:", p.priceNative);
                     // console.log("pairAddress:", p.pairAddress);
                     console.log("dexId:", j);

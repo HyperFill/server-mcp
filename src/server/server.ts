@@ -6,7 +6,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 
 import { config } from "../services/config";
-import { fetchMcpSeiClient } from "../client/MCPSSEClient";
+import { fetchMcpHederaClient } from "../client/MCPSSEClient";
 import HyperFillMMClient from "../client/hyper-fillmm-client";
 
 import { MarketManager } from "../services/market-manager";
@@ -20,7 +20,7 @@ const server = new McpServer({ name: "example-server", version: "1.0.0" });
 
 const hyperfillApi = new HyperFillMMClient({ account: config.account, privateKey: config.agentPrivateKey })
 const marketManager = new MarketManager()
-registerTools(server, marketManager, fetchMcpSeiClient);
+registerTools(server, marketManager, fetchMcpHederaClient);
 
 
 // session -> transport map

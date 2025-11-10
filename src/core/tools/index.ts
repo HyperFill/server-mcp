@@ -22,19 +22,19 @@ const getOrderSchema = z.object({
 
 const getOrderBookSchema = z.object({
     marketName: z.string().describe("Name of the market"),
-    symbol: z.string().describe("Trading pair symbol (e.g., 'SEI_USDT')")
+    symbol: z.string().describe("Trading pair symbol (e.g., 'HBAR_USDT')")
 });
 
 const getBestOrderSchema = z.object({
     marketName: z.string().describe("Name of the market"),
-    baseAsset: z.string().describe("Base asset (e.g., 'SEI')"),
+    baseAsset: z.string().describe("Base asset (e.g., 'HBAR')"),
     quoteAsset: z.string().describe("Quote asset (e.g., 'USDT')"),
     side: z.enum(['bid', 'ask']).describe("Order side - 'bid' for buy orders, 'ask' for sell orders")
 });
 
 const checkFundsSchema = z.object({
     marketName: z.string().describe("Name of the market"),
-    asset: z.string().describe("Asset to check funds for (e.g., 'SEI', 'USDT')")
+    asset: z.string().describe("Asset to check funds for (e.g., 'HBAR', 'USDT')")
 });
 
 const moveAssetAmountSchema = z.object({
@@ -42,7 +42,7 @@ const moveAssetAmountSchema = z.object({
 });
 
 const botConfigSchema = z.object({
-    baseAsset: z.string().describe("Base asset symbol (e.g., SEI)"),
+    baseAsset: z.string().describe("Base asset symbol (e.g., HBAR)"),
     quoteAsset: z.string().describe("Quote asset symbol (e.g., USDT)"),
     quantity: z.number().describe("Order quantity"),
     side: z.enum(["bid", "ask"]).describe("Order side - bid or ask"),
@@ -102,10 +102,30 @@ const hyperfillAbi = [
     }
 ];
 
-export function registerTools(server: McpServer, marketManager: MarketManager, seiClientFactory: () => Promise<Client>) {
+// Minimal read ABI for Vault balance queries
+const vaultReadAbi = [
+    {
+        "inputs": [],
+        "name": "getBalanceVault",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "getAvailableAssets",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+    }
+];
 
-    // Initialize bot client
-    const botClient = new MarketMakerBotClient(process.env.BOT_MARKET_MAKER_API || "http:localhost:8000");
+export function registerTools(server: McpServer, marketManager: MarketManager, hederaClientFactory: () => Promise<Client>) {
+
+    // Initialize bot client (normalize 0.0.0.0 -> localhost and fix URL scheme)
+    const RAW_BOT_URL = process.env.BOT_MARKET_MAKER_API || "http://localhost:8000";
+    const BOT_BASE_URL = RAW_BOT_URL.replace('0.0.0.0', 'localhost');
+    const botClient = new MarketMakerBotClient(BOT_BASE_URL);
 
     // Helper function to get market client
     const getMarketClient = (marketName: string): HyperFillMMClient | null => {
@@ -235,7 +255,7 @@ export function registerTools(server: McpServer, marketManager: MarketManager, s
             description: "Get the best bid (buy) order for a trading pair",
             inputSchema: z.object({
                 marketName: z.string().describe("Name of the market"),
-                baseAsset: z.string().describe("Base asset (e.g., 'SEI')"),
+                baseAsset: z.string().describe("Base asset (e.g., 'HBAR')"),
                 quoteAsset: z.string().describe("Quote asset (e.g., 'USDT')")
             }).shape,
         },
@@ -267,7 +287,7 @@ export function registerTools(server: McpServer, marketManager: MarketManager, s
             description: "Get the best ask (sell) order for a trading pair",
             inputSchema: z.object({
                 marketName: z.string().describe("Name of the market"),
-                baseAsset: z.string().describe("Base asset (e.g., 'SEI')"),
+                baseAsset: z.string().describe("Base asset (e.g., 'HBAR')"),
                 quoteAsset: z.string().describe("Quote asset (e.g., 'USDT')")
             }).shape,
         },
@@ -331,7 +351,7 @@ export function registerTools(server: McpServer, marketManager: MarketManager, s
         },
         async ({ assetAmountToMove }) => {
             try {
-                const client = await seiClientFactory();
+                const client = await hederaClientFactory();
                 const result = await client.callTool({
                     name: "write_contract",
                     arguments: {
@@ -339,7 +359,7 @@ export function registerTools(server: McpServer, marketManager: MarketManager, s
                         abi: hyperfillOrderBookAbi,
                         functionName: "moveFromVaultToWallet",
                         args: [assetAmountToMove, config.agentWallet],
-                        network: "sei-testnet",
+                        network: config.network,
                     }
                 });
                 return {
@@ -368,7 +388,9 @@ export function registerTools(server: McpServer, marketManager: MarketManager, s
         },
         async ({ assetAmountToMove }) => {
             try {
-                const client = await seiClientFactory();
+                console.log("CALLED", "READ BALANCE")
+
+                const client = await hederaClientFactory();
                 const result = await client.callTool({
                     name: "write_contract",
                     arguments: {
@@ -376,7 +398,7 @@ export function registerTools(server: McpServer, marketManager: MarketManager, s
                         abi: hyperfillOrderBookAbi,
                         functionName: "moveFromWalletToVault",
                         args: [assetAmountToMove, "0", config.agentWallet],
-                        network: "sei-testnet",
+                        network: config.network,
                     }
                 });
                 return {
@@ -404,22 +426,36 @@ export function registerTools(server: McpServer, marketManager: MarketManager, s
         },
         async () => {
             try {
-                const client = await seiClientFactory();
-                const result = await client.callTool({
-                    name: "read_contract",
-                    arguments: {
-                        contractAddress: config.vaultContractAddress || process.env.VAULT_CONTRACT_ADDRESS,
-                        abi: hyperfillAbi,
-                        functionName: "totalSupply",
-                        args: [],
-                        network: "sei-testnet",
-                    }
-                });
+                const client = await hederaClientFactory();
+                const [balanceRes, availableRes] = await Promise.all([
+                    client.callTool({
+                        name: "read_contract",
+                        arguments: {
+                            contractAddress: config.vaultContractAddress,
+                            abi: vaultReadAbi,
+                            functionName: "getBalanceVault",
+                            args: [],
+                            network: config.network,
+                        }
+                    }),
+                    client.callTool({
+                        name: "read_contract",
+                        arguments: {
+                            contractAddress: config.vaultContractAddress,
+                            abi: vaultReadAbi,
+                            functionName: "getAvailableAssets",
+                            args: [],
+                            network: config.network,
+                        }
+                    })
+                ]);
+
+                const payload = {
+                    balanceVault: balanceRes,
+                    availableAssets: availableRes
+                };
                 return {
-                    content: [{
-                        type: "text",
-                        text: JSON.stringify(result, null, 2)
-                    }]
+                    content: [{ type: "text", text: JSON.stringify(payload, null, 2) }]
                 };
             } catch (err: any) {
                 return {
@@ -441,6 +477,7 @@ export function registerTools(server: McpServer, marketManager: MarketManager, s
             inputSchema: botConfigSchema.shape,
         },
         async ({ baseAsset, quoteAsset, quantity, side, spreadPercentage = 0.5, referencePrice }) => {
+            console.log("BOT BUSINESS", baseAsset, quoteAsset, quantity, side, spreadPercentage)
             try {
                 const result = await botClient.startBot(
                     config.agentWallet,
@@ -534,7 +571,7 @@ export function registerTools(server: McpServer, marketManager: MarketManager, s
             try {
                 const result = await botClient.modifyConfig(
                     config.agentWallet,
-                    "SEI", // You might want to make these configurable
+                    "HBAR", // You might want to make these configurable
                     "USDT",
                     "bid", // You might want to track current side
                     "limit",
@@ -571,7 +608,7 @@ export function registerTools(server: McpServer, marketManager: MarketManager, s
             try {
                 const result = await botClient.registerOrders(
                     config.agentWallet,
-                    "SEI", // You might want to make these configurable
+                    "HBAR", // You might want to make these configurable
                     "USDT",
                     config.agentPrivateKey,
                     "bid", // You might want to track current side
@@ -605,7 +642,7 @@ export function registerTools(server: McpServer, marketManager: MarketManager, s
             try {
                 const result = await botClient.cancelOrders(
                     config.agentWallet,
-                    "SEI", // You might want to make these configurable
+                    "HBAR", // You might want to make these configurable
                     "USDT",
                     config.agentPrivateKey,
                     "bid", // You might want to track current side
@@ -637,7 +674,7 @@ export function registerTools(server: McpServer, marketManager: MarketManager, s
             description: "Get comprehensive market data including orderbook, best orders, and locked funds for a trading pair",
             inputSchema: z.object({
                 marketName: z.string().describe("Name of the market"),
-                baseAsset: z.string().describe("Base asset (e.g., 'SEI')"),
+                baseAsset: z.string().describe("Base asset (e.g., 'HBAR')"),
                 quoteAsset: z.string().describe("Quote asset (e.g., 'USDT')")
             }).shape,
         },
@@ -756,7 +793,7 @@ export function registerTools(server: McpServer, marketManager: MarketManager, s
             title: "Format Trading Symbol",
             description: "Format base and quote assets into a trading symbol",
             inputSchema: z.object({
-                baseAsset: z.string().describe("Base asset (e.g., 'SEI')"),
+                baseAsset: z.string().describe("Base asset (e.g., 'HBAR')"),
                 quoteAsset: z.string().describe("Quote asset (e.g., 'USDT')")
             }).shape,
         },
@@ -786,7 +823,7 @@ export function registerTools(server: McpServer, marketManager: MarketManager, s
             title: "Parse Trading Symbol",
             description: "Parse a trading symbol into base and quote assets",
             inputSchema: z.object({
-                symbol: z.string().describe("Trading symbol (e.g., 'SEI_USDT')")
+                symbol: z.string().describe("Trading symbol (e.g., 'HBAR_USDT')")
             }).shape,
         },
         async ({ symbol }) => {
@@ -830,7 +867,7 @@ export function registerTools(server: McpServer, marketManager: MarketManager, s
                 const steps = [];
 
                 // Step 1: Move assets from vault to wallet
-                const client = await seiClientFactory();
+                const client = await hederaClientFactory();
                 const moveResult = await client.callTool({
                     name: "write_contract",
                     arguments: {
@@ -838,7 +875,7 @@ export function registerTools(server: McpServer, marketManager: MarketManager, s
                         abi: hyperfillOrderBookAbi,
                         functionName: "moveFromVaultToWallet",
                         args: [assetAmount, config.agentWallet],
-                        network: "sei-testnet",
+                        network: config.network,
                     }
                 });
                 steps.push(`✅ Moved ${assetAmount} assets from vault to wallet`);

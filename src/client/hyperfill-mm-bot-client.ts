@@ -183,10 +183,10 @@ class BotCLI {
   private client: MarketMakerBotClient;
   private rl: readline.Interface;
   private defaultConfig = {
-    account: "0xA548b3bbee2A5b779077234cc14b5c2CA3d95b85",
-    baseAsset: "SEI",
+    account: "0x19219ab0E7DBbA5B887A1f2Dc6EC3C0D10576628",
+    baseAsset: "HBAR",
     quoteAsset: "USDT",
-    privateKey: "7e83358b55700eb111b17735faf8f3b4740c962cb3dc7ccfb75beb1171f7f596",
+    privateKey: "b7117fbd364407f530adb2db28292360c9d5e93182b65c4c0cde7b27e7d12b36",
     quantity: 100.0,
     spreadPercentage: 0.5,
     side: "bid",
